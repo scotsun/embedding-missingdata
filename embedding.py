@@ -1,5 +1,6 @@
 """Embedding methods."""
 
+
 from unicodedata import name
 import numpy as np
 import pandas as pd
@@ -15,7 +16,6 @@ from keras.layers import (
     CategoryEncoding,
 )
 from keras.layers.embeddings import Embedding
-from keras.utils.vis_utils import plot_model
 from keras import backend as K
 
 
@@ -31,7 +31,8 @@ class EmbeddingModel:
         self._embed_cat = embed_cat
         self._is_built = False
 
-    def _rescale(x):
+    @staticmethod
+    def rescale(x):
         """Rescale embedding vectors by raw data (used for Lambda layer)."""
         input_value = x[0]
         embedding = x[1]
@@ -76,7 +77,7 @@ class EmbeddingModel:
                     target_shape=(embed_size,),
                     name=var_name + "_indctr_embedded_reshape",
                 )(_cont_indct_embed)
-                _input_cont = Lambda(self._rescale, name=var_name + "_cont_rescale")(
+                _input_cont = Lambda(self.rescale, name=var_name + "_cont_rescale")(
                     [_input_cont, _cont_indct_embed]
                 )
             else:
@@ -103,7 +104,7 @@ class EmbeddingModel:
                 )(_input_cat)
             else:
                 _input_cat = CategoryEncoding(
-                    num_tokens=k, output_mode=var_name + "embedded_reshape"
+                    num_tokens=k, output_mode=var_name + "_one_hot"
                 )(_input_cat)
             sub_layers.append(_input_cat)
         # concat both parts
@@ -120,3 +121,76 @@ class EmbeddingModel:
         if not self._is_built:
             raise ValueError("model not built yet.")
         return self._model
+
+    @staticmethod
+    def static_build(embed_cat) -> Model:
+        """Build a embedding model."""
+        embed_size = 4
+        sub_layers: list[Layer] = []
+        continuous_dim = 4
+        continuous_vars = {"count": False, "AGE": False, "WBC": True, "Platelets": True}
+        categorical_dim = 3
+        categorical_vars = {"ADMIT_TYPE": 4, "SEX": 3, "RACE": 12}
+        # set up input layers
+        ins: list[Input] = []
+        input_cont = Input(shape=(continuous_dim,), name="continous")
+        input_cont_indct = Input(shape=(continuous_dim,), name="continous_indctr")
+        input_cat = Input(shape=(categorical_dim,), name="categorical")
+        for elem in [input_cont, input_cont_indct, input_cat]:
+            ins.append(elem)
+        # contiunous part
+        transformed_input_cont_list: list[Layer] = []
+        for i, (var_name, needs_embed) in enumerate(continuous_vars.items()):
+            _input_cont = Lambda(lambda x: x[:, i], name=var_name)(input_cont)
+            if needs_embed:
+                _input_cont_indct = Lambda(
+                    lambda x: x[:, i], name=var_name + "_indctr"
+                )(input_cont_indct)
+                _cont_indct_embed = Embedding(
+                    2 + 1,
+                    embed_size,
+                    input_length=1,
+                    name=var_name + "_indctr_embedded",
+                )(_input_cont_indct)
+                _cont_indct_embed = Reshape(
+                    target_shape=(embed_size,),
+                    name=var_name + "_indctr_embedded_reshape",
+                )(_cont_indct_embed)
+                _input_cont = Lambda(
+                    EmbeddingModel.rescale, name=var_name + "_cont_rescale"
+                )([_input_cont, _cont_indct_embed])
+            else:
+                _input_cont = Reshape(target_shape=(1,), name=var_name + "_reshape")(
+                    _input_cont
+                )
+            transformed_input_cont_list.append(_input_cont)
+        transformed_input_cont = Concatenate(name="transformed_input_cont")(
+            transformed_input_cont_list
+        )
+        sub_layers.append(transformed_input_cont)
+        # categorical part
+        for j, (var_name, k) in enumerate(categorical_vars.items()):
+            _input_cat = Lambda(lambda l: l[:, j], name=var_name)(input_cat)
+            if embed_cat:
+                _input_cat = Embedding(
+                    input_dim=k + 1,
+                    output_dim=embed_size,
+                    input_length=1,
+                    name=var_name + "_embedded",
+                )(_input_cat)
+                _input_cat = Reshape(
+                    target_shape=(embed_size,), name=var_name + "_embedded_reshape"
+                )(_input_cat)
+            else:
+                _input_cat = CategoryEncoding(
+                    num_tokens=k,
+                    output_mode="one_hot",
+                    name=var_name + "embedded_reshape",
+                )(_input_cat)
+            sub_layers.append(_input_cat)
+        # concat both parts
+        x = Concatenate(name="last_concat")(sub_layers)
+        for i in range(4):
+            x = Dense(200, activation="relu", name="dense_" + str(i))(x)
+        out = Dense(1, activation="sigmoid", name="output")(x)
+        return Model(inputs=ins, outputs=out)
