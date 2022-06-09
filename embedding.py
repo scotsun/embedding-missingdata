@@ -1,7 +1,6 @@
 """Embedding methods."""
 
 
-from unicodedata import name
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -18,6 +17,8 @@ from keras.layers import (
 from keras.layers.embeddings import Embedding
 from keras import backend as K
 
+# TODO: self._X_train has not developed yet.
+
 
 class EmbeddingModel:
     """Implement embedding method to solve data missingness. This only has not been generalized yet."""
@@ -30,6 +31,7 @@ class EmbeddingModel:
         self._target = target
         self._embed_cat = embed_cat
         self._is_built = False
+        self._X_train: pd.DataFrame = pd.DataFrame()
 
     @staticmethod
     def rescale(x):
@@ -194,3 +196,20 @@ class EmbeddingModel:
             x = Dense(200, activation="relu", name="dense_" + str(i))(x)
         out = Dense(1, activation="sigmoid", name="output")(x)
         return Model(inputs=ins, outputs=out)
+
+
+def extract_embeddings(model: EmbeddingModel):
+    """Extract embedding weights from the corresponding layers."""
+    dfs: list[pd.DataFrame] = []
+    for layer in model.model.layers:
+        if isinstance(layer, Embedding):
+            M = layer.get_weights()[0]
+            k = M.shape[0]
+            layer_name = layer.name
+            cat_var = layer_name[:-9]
+            _df = pd.DataFrame(
+                pd.get_dummies([cat_var]).values.dot(M),
+                columns=[layer_name + str(i) for i in range(4)],
+                index=model._X_train.index,
+            )
+            dfs.append(_df)
