@@ -1,10 +1,8 @@
 """Panel Data Example."""
 
-from pyexpat import model
 import numpy as np
-import matplotlib.pyplot as plt
-from keras import models
-from keras.layers import Dense, LSTM
+import pandas as pd
+from keras.metrics import AUC
 
 
 def generate_data(n_obs: int, timesteps: int) -> tuple[np.ndarray, np.ndarray]:
@@ -23,15 +21,28 @@ def generate_data(n_obs: int, timesteps: int) -> tuple[np.ndarray, np.ndarray]:
     return X, Y
 
 
-def main() -> None:
-    """Build and fit NN."""
-    X, Y = generate_data(10000, 10)
-    lstm_nn = models.Sequential()
-    lstm_nn.add(LSTM(4, activation="tanh", input_shape=(10, 2)))
-    lstm_nn.add(Dense(1))
-    lstm_nn.compile(optimizer="adam", loss="mean_squared_error")
-    lstm_nn.fit(X, Y, validation_split=0.15, epochs=50, batch_size=256)
+def auc_and_N(grouped: pd.DataFrame) -> pd.Series:
+    """Summarize the grouped data-frame."""
+    output: dict[str, np.float64 | int] = dict()
+    y = grouped["outcome"]
+    p = grouped["p"]
+    auc = AUC()
+    auc.update_state(y, p)
+    output["auc_i"] = auc.result().numpy()
+    output["N_i"] = len(y)
+    return pd.Series(output, index=["auc_i", "N_i"])
 
 
-if __name__ == "__main__":
-    main()
+def stratified_auc(outcome_data: pd.DataFrame) -> pd.DataFrame:
+    """Calculate the stratified auc scores."""
+    return outcome_data.groupby("count").apply(auc_and_N)
+
+
+def auc_w(stratified_auc: pd.DataFrame) -> np.float64:
+    """Calculate the weighted auc."""
+    weighted_auc = (
+        stratified_auc["auc_i"].values
+        * stratified_auc["N_i"].values
+        / stratified_auc["N_i"].values.sum()
+    ).sum()
+    return weighted_auc
