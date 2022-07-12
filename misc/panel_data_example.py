@@ -2,23 +2,23 @@
 
 import numpy as np
 import pandas as pd
+from keras.models import Sequential
+from keras.layers import Dense, LSTM, TimeDistributed
 from keras.metrics import AUC
+from keras.utils import to_categorical
 
 
-def generate_data(n_obs: int, timesteps: int) -> tuple[np.ndarray, np.ndarray]:
-    """Generate simulated data."""
-    X = np.zeros((n_obs, timesteps * 2))
-    X[: int(n_obs / 2), 1] = 1
-    Y = np.zeros((n_obs, 1))
-    for i in range(n_obs):
-        for j in range(0, timesteps * 2, 2):
-            X[i, j] = np.random.random()
-        if X[i, 1] == 0:
-            Y[i] = X[i, -2] * 3
-        if X[i, 1] == 1:
-            Y[i] = X[i, -2] * 9
-    X = X.reshape((n_obs, timesteps, 2))
-    return X, Y
+def train_generator():
+    """Generate simulated training data."""
+    while True:
+        sequence_length = np.random.randint(10, 100)
+        x_train = np.random.random((50, sequence_length, 5))
+        # y_train will depend on past 5 timesteps of x
+        y_train = x_train[:, :, 0]
+        for i in range(1, 5):
+            y_train[:, i:] += x_train[:, :-i, i]
+        y_train = to_categorical(y_train > 2.5)
+        yield x_train, y_train
 
 
 def auc_and_N(grouped: pd.DataFrame) -> pd.Series:
@@ -46,3 +46,18 @@ def auc_w(stratified_auc: pd.DataFrame) -> np.float64:
         / stratified_auc["N_i"].values.sum()
     ).sum()
     return weighted_auc
+
+
+def main():
+    """Build main."""
+    model = Sequential()
+    model.add(LSTM(32, return_sequences=True, input_shape=(None, 5)))
+    model.add(LSTM(8, return_sequences=True))
+    model.add(TimeDistributed(Dense(2, activation="softmax")))
+    print(model.summary())
+    model.compile(loss="categorical_crossentropy", optimizer="adam")
+    model.fit(train_generator(), steps_per_epoch=30, epochs=10, verbose=1)
+
+
+if __name__ == "__main__":
+    main()
