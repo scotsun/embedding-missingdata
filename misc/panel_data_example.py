@@ -11,8 +11,8 @@ from keras.utils import to_categorical
 def train_generator():
     """Generate simulated training data."""
     while True:
-        sequence_length = np.random.randint(10, 100)
-        x_train = np.random.random((50, sequence_length, 5))
+        sequence_length = np.random.randint(1, 14)
+        x_train = np.random.random((248, sequence_length, 5))
         # y_train will depend on past 5 timesteps of x
         y_train = x_train[:, :, 0]
         for i in range(1, 5):
@@ -28,7 +28,8 @@ def auc_and_N(grouped: pd.DataFrame) -> pd.Series:
     p = grouped["p"]
     auc = AUC()
     auc.update_state(y, p)
-    output["auc_i"] = auc.result().numpy()
+    auc_i = auc.result().numpy()
+    output["auc_i"] = 1 if auc_i == 0 else auc_i
     output["N_i"] = len(y)
     return pd.Series(output, index=["auc_i", "N_i"])
 
