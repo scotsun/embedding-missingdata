@@ -6,7 +6,6 @@
 # os.system("Rscript ./rscript.r 5 100")
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
-import pandas as pd
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.conversion import localconverter
 
@@ -24,4 +23,4 @@ rfun(dataframe)
 
 # convert R df to pd.DataFrame
 with localconverter(robjects.default_converter + pandas2ri.converter):
-  df = robjects.conversion.rpy2py(dataframe)
+    df = robjects.conversion.rpy2py(dataframe)
