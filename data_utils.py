@@ -1,6 +1,5 @@
 """Data utility classes."""
 
-from abc import abstractclassmethod
 from typing import Iterable
 
 import numpy as np
@@ -23,7 +22,7 @@ class DataSequence:
         self.y_var_name = y_var_name
         for col in columns:
             self.data[col] = []
-        self.n_sample = 0
+        self._n_sample = 0
 
     @property
     def n_sample(self) -> int:
@@ -43,9 +42,9 @@ class DataSequence:
 
     def shuffle(self) -> None:
         """Shuffle samples."""
-        _seed = np.random.randint(1e4)
+        s = np.random.randint(1e4)  # type: ignore
         for col in self.data.keys():
-            np.random.seed(_seed)
+            np.random.seed(s)
             np.random.shuffle(self.data[col])
 
     def __getitem__(self, index: int) -> tuple:
@@ -74,6 +73,7 @@ class DataLoader(Sequence):
         self._rawX = X
         self._rawy = y
         self._batch_size = batch_size
+        self._parse_and_preprocess()
         self._rawX.index = ids
         self._rawy.index = ids
         self._n_samples = np.unique(ids).size
@@ -105,7 +105,7 @@ class DataLoader(Sequence):
         p = len(self._continuous_vars_info)
         cont_col_names = list(self._continuous_vars_info.keys())
         cont_indicate = list(self._continuous_vars_info.values())
-        cont_indicate_data = self.continous_indctr_data
+        cont_indicate_data = self.continuous_indctr_data
         for i in range(p):
             if cont_indicate[i]:
                 self._rawX[cont_col_names[i] + "_indctr"] = cont_indicate_data[:, i]
@@ -123,7 +123,7 @@ class DataLoader(Sequence):
     @property
     def continuous_vars_info(self) -> dict:
         """Get continuous_vars_info."""
-        return self._continuous_var_info
+        return self._continuous_vars_info
 
     @property
     def categorical_vars_info(self) -> dict:
@@ -149,21 +149,6 @@ class DataLoader(Sequence):
     def n_sample(self) -> int:
         """Get the number of samples."""
         return self._n_samples
-
-    @abstractclassmethod
-    def __getitem__(self, index) -> tuple:
-        """Get a batch data."""
-        pass
-
-    @abstractclassmethod
-    def __len__(self) -> int:
-        """Get the total number of batches per epoch."""
-        pass
-
-    @abstractclassmethod
-    def on_epoch_end(self) -> None:
-        """Shuffle data after each epoch."""
-        pass
 
 
 class DataSeqLoader(DataLoader):
