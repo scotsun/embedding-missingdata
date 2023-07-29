@@ -27,7 +27,7 @@ class DataSequence:
     @property
     def n_sample(self) -> int:
         """Get self.n_sample."""
-        return self.n_sample
+        return self._n_sample
 
     def add(self, grouped_data: DataFrameGroupBy, id: int) -> None:
         """Add a patient data by the id."""
@@ -166,7 +166,7 @@ class DataSeqLoader(DataLoader):
         data = self._rawX.copy()
         data[self._rawy.name] = self._rawy
         grouped_data = data.groupby(data.index.name)
-        timesteps = grouped_data[self._rawy.name].count()
+        timesteps: pd.Series = grouped_data[self._rawy.name].count()
         # initialize
         data_seqs: list[DataSequence] = [
             DataSequence(
@@ -178,7 +178,7 @@ class DataSeqLoader(DataLoader):
             for t in range(1, 15)
         ]
         # start populating
-        for pid in tqdm(timesteps.indices):
+        for pid in tqdm(timesteps.index):
             t = timesteps.get(pid)
             data_seqs[t - 1].add(grouped_data, pid)
         self.data_seqs = data_seqs

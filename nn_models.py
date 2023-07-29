@@ -186,13 +186,13 @@ class EmbeddingModel(NN):
                     num_tokens=k, output_mode="one_hot", name=var_name + "_one_hot"
                 )(_input_cat)
                 sub_layers.append(_input_cat)
-            # concat both parts
-            x = Concatenate(name="last_concat")(sub_layers)
-            for i in range(4):
-                x = Dense(100, activation="relu", name="dense" + str(i))(x)
-                x = Dropout(0.5)(x)
-            out = Dense(1, activation="sigmoid", name="output")(x)
-            self._model = Model(inputs=ins, outputs=out)
+        # concat both parts
+        x = Concatenate(name="last_concat")(sub_layers)
+        for i in range(4):
+            x = Dense(100, activation="relu", name="dense" + str(i))(x)
+            x = Dropout(0.5)(x)
+        out = Dense(1, activation="sigmoid", name="output")(x)
+        self._model = Model(inputs=ins, outputs=out)
 
 
 class MLPModel(NN):
@@ -246,7 +246,7 @@ class MLPModel(NN):
         self._model = Model(inputs=ins, outputs=out)
 
 
-class EmbeddingLSTM(NN):
+class EmbeddingLSTMModel(NN):
     """Implement embedding method to solve missingness with LSTM seq2seq classifier."""
 
     def build(self) -> None:
@@ -330,12 +330,12 @@ class EmbeddingLSTM(NN):
                     name=var_name + "_one_hot",
                 )(_input_cat)
                 sub_layers.append(_input_cat)
-            # concat both parts
-            x = TimeDistributed(Concatenate(), name="last_concat")(sub_layers)
-            for i in range(3):
-                x = LSTM(128, return_sequences=True, name="lstm" + str(i))(x)
-            out = TimeDistributed(Dense(1, activation="sigmoid"), name="output")(x)
-            self._model = Model(inputs=ins, outputs=out)
+        # concat both parts
+        x = TimeDistributed(Concatenate(), name="last_concat")(sub_layers)
+        for i in range(3):
+            x = LSTM(128, return_sequences=True, name="lstm" + str(i))(x)
+        out = TimeDistributed(Dense(1, activation="sigmoid"), name="output")(x)
+        self._model = Model(inputs=ins, outputs=out)
 
 
 class LSTMModel(NN):
