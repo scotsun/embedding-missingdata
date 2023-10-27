@@ -10,16 +10,26 @@ from keras.utils import Sequence
 
 
 class DataSequence:
-    """Store tabuelated time-serie data in shape (n_sample, timesteps, 1) for each variable."""
+    """
+    Store tabuelated time-serie data in shape (n_sample, timesteps, 1) for each variable.
+
+    many_to_one: bool indicate output shape (n_sample,) vs (n_sample, timesteps, 1)
+    """
 
     def __init__(
-        self, timesteps: int, batch_size: int, columns: Iterable, y_var_name: str
+        self,
+        timesteps: int,
+        batch_size: int,
+        columns: Iterable,
+        y_var_name: str,
+        many_to_one: bool = False,
     ) -> None:
         """Init."""
         self.timesteps = timesteps
         self.batch_size = batch_size
         self.data: dict[str, list] = dict()
         self.y_var_name = y_var_name
+        self.many_to_one = many_to_one
         for col in columns:
             self.data[col] = []
         self._n_sample = 0
@@ -56,6 +66,8 @@ class DataSequence:
             if col != self.y_var_name:
                 X_batch.append(np.array(self.data[col][start:end]))
         y_batch: np.ndarray = np.array(self.data[self.y_var_name][start:end])
+        if self.many_to_one:
+            y_batch = y_batch[:, -1, :].reshape((-1, 1))
         return X_batch, y_batch
 
     def __len__(self) -> int:
@@ -155,10 +167,18 @@ class DataSeqLoader(DataLoader):
     """DataSeqLoader, a subclass of DataLoader, which reshape the data into DataSequence objects."""
 
     def __init__(
-        self, X: pd.DataFrame, y: pd.Series, ids: pd.Series, batch_size: int
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        ids: pd.Series,
+        max_t: int,
+        batch_size: int,
+        many_to_one: bool = False,
     ) -> None:
         """Init."""
         super().__init__(X, y, ids, batch_size)
+        self._max_t = max_t
+        self._many_to_one = many_to_one
         self._populate_data_seq()
 
     def _populate_data_seq(self) -> None:
@@ -167,15 +187,16 @@ class DataSeqLoader(DataLoader):
         data[self._rawy.name] = self._rawy
         grouped_data = data.groupby(data.index.name)
         timesteps: pd.Series = grouped_data[self._rawy.name].count()
-        # initialize
+        # initialize (data_seqs are stratified w.r.t. num timesteps)
         data_seqs: list[DataSequence] = [
             DataSequence(
                 timesteps=t,
                 batch_size=self._batch_size,
                 columns=data.columns,
                 y_var_name=self._rawy.name,
+                many_to_one=self._many_to_one,
             )
-            for t in range(1, 15)
+            for t in range(1, self._max_t + 1)
         ]
         # start populating
         for pid in tqdm(timesteps.index):

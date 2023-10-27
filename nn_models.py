@@ -6,8 +6,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
-
 import tensorflow as tf
 from keras import Model
 from keras.layers import (
