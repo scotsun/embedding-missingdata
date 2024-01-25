@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 
 
-def data_gen(n: int, p: int, max_t: int) -> pd.DataFrame:
+def data_gen(n: int, p: int, max_t: int):
     """
-    Generate fake longitudinal data with `n` subjects and `p` predictors.
+    Generate fake longitudinal data with `n` subjects and `p` predictors and one categorical var.
 
     Note: outcome variable is included. `max_t` is the maximum num of obs from a subject
     """
@@ -30,4 +30,12 @@ def data_gen(n: int, p: int, max_t: int) -> pd.DataFrame:
     df = pd.concat(
         [df, pd.DataFrame(X, columns=["X" + str(i) for i in range(p)])], axis=1
     )
-    return df
+
+    df_cat = pd.DataFrame()
+    df_cat["id"] = _pids
+    df_cat["C1"] = np.random.choice(6, n, replace=True)
+    df_cat["C2"] = np.random.choice(3, n, replace=True)
+    df_cat["C1"] = df_cat["C1"].astype("object")
+    df_cat["C2"] = df_cat["C2"].astype("object")
+
+    return df.merge(df_cat, how="left", on="id")

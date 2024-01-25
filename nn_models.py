@@ -23,7 +23,7 @@ from keras.layers import (
 )
 from keras.callbacks import EarlyStopping, ModelCheckpoint, History
 from keras.optimizers import Adam
-from keras.metrics import AUC
+from keras.metrics import Accuracy
 from keras import backend as K
 
 from data_utils import DataLoader, DataSeqLoader, DataTableLoader
@@ -67,9 +67,11 @@ class NN:
             )
         if self._model is None:
             raise ValueError("Model has not been built yet.")
-        auc = AUC(curve=metric_curve, name="auc")
+        # auc = AUC(curve=metric_curve, name="auc")
         self._model.compile(
-            loss="binary_crossentropy", optimizer=Adam(learning_rate=lr), metrics=[auc]
+            loss="binary_crossentropy",
+            optimizer=Adam(learning_rate=lr),
+            metrics=[Accuracy(name="acc")],
         )
         early_stopping = EarlyStopping(monitor="val_loss", patience=5, mode="min")
         save_best = ModelCheckpoint(
@@ -170,6 +172,7 @@ class EmbeddingModel(NN):
             _input_cat = Input(shape=(1,), name=var_name)
             ins.append(_input_cat)
             if self._embed_categorical_data:
+                print("!!!")
                 _input_cat = Embedding(
                     input_dim=k,
                     output_dim=embed_size,
@@ -179,11 +182,12 @@ class EmbeddingModel(NN):
                 _input_cat = Reshape(
                     target_shape=(embed_size,), name=var_name + "embedded_reshape"
                 )(_input_cat)
+
             else:  # otherwise, apply one-hot encoding
                 _input_cat = CategoryEncoding(
                     num_tokens=k, output_mode="one_hot", name=var_name + "_one_hot"
                 )(_input_cat)
-                sub_layers.append(_input_cat)
+            sub_layers.append(_input_cat)
         # concat both parts
         x = Concatenate(name="last_concat")(sub_layers)
         for i in range(4):
@@ -323,13 +327,15 @@ class EmbeddingLSTMModel(NN):
                     name=var_name + "embedded_reshape",
                 )(_input_cat)
             else:  # otherwise, apply one-hot encoding
-                _input_cat = TimeDistributed(
-                    CategoryEncoding(num_tokens=k, output_mode="one_hot"),
+                _input_cat = TimeDistributedOneHotEncoding(
+                    num_tokens=k,
                     name=var_name + "_one_hot",
                 )(_input_cat)
-                sub_layers.append(_input_cat)
+            print(_input_cat.shape)
+            sub_layers.append(_input_cat)
         # concat both parts
-        x = TimeDistributed(Concatenate(), name="last_concat")(sub_layers)
+        x = Concatenate(axis=2, name="last_concat")(sub_layers)
+
         for i in range(3):
             x = LSTM(128, return_sequences=True, name="lstm" + str(i))(x)
         out = TimeDistributed(Dense(1, activation="sigmoid"), name="output")(x)
@@ -366,6 +372,7 @@ class LSTMModel(NN):
             sub_layers.append(_input_cont)
         # categorical part
         for var_name, k in dataloader.categorical_vars_info.items():
+            print(self._embed_categorical_data)
             var_name = var_name.lower()
             _input_cat = Input(
                 shape=(
@@ -375,6 +382,7 @@ class LSTMModel(NN):
                 name=var_name,
             )
             ins.append(_input_cat)
+
             if self._embed_categorical_data:
                 _input_cat = TimeDistributed(
                     Embedding(input_dim=k, output_dim=embed_size, input_length=1),
@@ -385,8 +393,8 @@ class LSTMModel(NN):
                     name=var_name + "_embedded_reshape",
                 )(_input_cat)
             else:  # otherwise, one-hot encode
-                _input_cat = TimeDistributed(
-                    CategoryEncoding(num_tokens=k, output_mode="one_hot"),
+                _input_cat = TimeDistributedOneHotEncoding(
+                    num_tokens=k,
                     name=var_name + "_one_hot",
                 )(_input_cat)
             sub_layers.append(_input_cat)
@@ -396,6 +404,26 @@ class LSTMModel(NN):
             x = LSTM(128, return_sequences=True, name="lstm" + str(i))(x)
         out = TimeDistributed(Dense(1, activation="sigmoid"), name="output")(x)
         self._model = Model(inputs=ins, outputs=out)
+
+
+class TimeDistributedOneHotEncoding(Layer):
+    def __init__(self, num_tokens, **kwargs):
+        super().__init__(**kwargs)
+        self.num_tokens = num_tokens
+
+    def call(self, inputs):
+        # Flatten the batch and time steps dimensions
+        shape = tf.shape(inputs)
+        batch_time = shape[0] * shape[1]
+        flat_inputs = tf.reshape(inputs, [batch_time, -1])
+
+        # Apply one-hot encoding
+        flat_inputs = tf.cast(flat_inputs, tf.int32)
+        encoded = tf.one_hot(flat_inputs, depth=self.num_tokens)
+
+        # Reshape back to the original 3D shape (batch, time, features)
+        new_shape = [shape[0], shape[1], self.num_tokens]
+        return tf.reshape(encoded, new_shape)
 
 
 def rescale(x: tuple[Any, Any]):

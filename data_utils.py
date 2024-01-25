@@ -4,6 +4,7 @@ from typing import Iterable
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from pandas.core.groupby.generic import DataFrameGroupBy
 from tqdm import tqdm
 from keras.utils import Sequence
@@ -61,11 +62,11 @@ class DataSequence:
         """Get a batch by the index."""
         start = index * self.batch_size
         end = min(start + self.batch_size, self.n_sample)
-        X_batch: list[np.ndarray] = []
+        X_batch: list[tf.Tensor] = []
         for col in self.data.keys():
             if col != self.y_var_name:
-                X_batch.append(np.array(self.data[col][start:end]))
-        y_batch: np.ndarray = np.array(self.data[self.y_var_name][start:end])
+                X_batch.append(tf.constant(self.data[col][start:end]))
+        y_batch: tf.Tensor = tf.constant(self.data[self.y_var_name][start:end])
         if self.many_to_one:
             y_batch = y_batch[:, -1, :].reshape((-1, 1))
         return X_batch, y_batch
