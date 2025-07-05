@@ -1,7 +1,10 @@
 # MNAR Missingness Embedding
 
-implement entity embedding for solving missingness in structured data and sequence data (i.e. EHR data)  
-**(miscellaneous sratch work of research)**
+Code for the paper:
+Sun M, Engelhard MM, Bedoya AD, Goldstein BA. Incorporating informatively collected laboratory data from EHR in clinical prediction models. BMC Medical Informatics and Decision Making. 2024 Jul 24;24(1):206.
+
+The code implement entity embedding for solving missingness in structured data and sequence data (i.e. EHR data)  
+---
 
 ## Modules
 
