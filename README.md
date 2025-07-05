@@ -1,8 +1,10 @@
 # MNAR Missingness Embedding
 
+
 implement entity embedding for solving missingness in structured data and sequence data (i.e. EHR data)  
 **(miscellaneous sratch work of research)**
 
+---
 ## Modules
 
 ### 1. `data_utils`:
